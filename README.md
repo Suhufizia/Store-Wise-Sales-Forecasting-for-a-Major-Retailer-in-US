@@ -4,7 +4,7 @@ The objective of our project is to develop a statistical Model to predict the We
 sales for each store using the historical sales data for 45 Walmart stores located
 in different regions.
 
-Domain: Retail Industry
+Domain: Retail Industry//
 Data source: Kaggle (https://www.kaggle.com/c/walmart-recruiting-store-sales-forecasting/data)
 Tools Used: Python, MS-Excel, R, Tableau
 Data Files:
