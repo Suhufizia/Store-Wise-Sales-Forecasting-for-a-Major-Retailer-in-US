@@ -1,0 +1,125 @@
+1. Loading data
+#Reading dataset from csv files
+#Features dataset consists of Unemployment, Fuel Price, Markdowns, CPI
+information
+features <- read.csv('features.csv')
+head(features)
+
+#Date split into Year, Month and Day.
+#Retrieving Week# from Date
+features$Date <- as.Date(features$Date, format = "%Y-%m-%d")
+features$Week <- format(features$Date, "%V")
+
+features <- separate(features, "Date", c("Year", "Month", "Day"), sep = "-")
+
+train <- read.csv("train.csv")
+
+train <- train %>%
+group_by(Store, Date, IsHoliday) %>%
+summarize(Weekly_Sales = sum(Weekly_Sales))
+
+train$Date <- as.Date(train$Date, format = "%Y-%m-%d")
+train <- separate(train, "Date", c("Year", "Month", "Day"), sep = '-')
+
+trainM <- merge(train,features)
+
+#Store Size information is available from Stores dataset
+stores <- read.csv("stores.csv")
+trainM <- merge(trainM, stores, by = "Store")
+
+# 2. Data Visualization
+
+#Distribution of Variables
+par(mfrow=c(2,2))
+hist(trainM$Store, col = 'light green', main = "Stores")
+hist(trainM$Temperature, col = 'light green', main = "Temperature")
+hist(trainM$Fuel_Price, col = 'light green', main = "Fuel Price")
+hist(trainM$CPI, col = 'light green', main = "CPI")
+hist(trainM$Unemployment, col = 'light green', main = "Unemployment")
+hist(trainM$Size, col = 'light green', main = "Store Size")
+
+par(mfrow = c(1,2))
+hist(trainM$Weekly_Sales, col = 'light green', main = "Weekly Sales
+Original", xlab = "Weekly Sales")
+hist(log(trainM$Weekly_Sales), col = 'light green', main = "Weekly Sales
+Transformed", xlab ='log(Weekly Sales)')
+
+library(ggplot2)
+View(trainM)
+ggplot(trainM, aes(x = Month,y = Weekly_Sales )) +
+geom_col() +
+facet_wrap(~Year) +
+ggtitle("Weekly Sales Distribution")
+
+ggplot(trainM, aes(x = Size, y = Weekly_Sales))+
+geom_point() +
+ggtitle("Store Size vs Sales")
+
+# 3. Grouping Weeks based on Sales
+#Using 2011 as base because data available for full year
+Weeks2011A <- trainM %>%
+filter(Year == 2011, Type == "A") %>%
+group_by(Type, Week) %>%
+summarize(Size = mean(Size), WeeklySales = sum(Weekly_Sales))
+
+Weeks2011B <- trainM %>%
+filter(Year == 2011, Type == "B") %>%
+group_by(Type, Week) %>%
+summarize(Size = mean(Size), WeeklySales = mean(Weekly_Sales))
+
+Weeks2011C <- trainM %>%
+filter(Year == 2011, Type == "C") %>%
+group_by(Type, Week) %>%
+summarize(Size = mean(Size), WeeklySales = mean(Weekly_Sales))
+
+# 4. Handling Markdown
+#Since we don't have much information on the missing values, only replacing
+#NA's with 0
+trainM[is.na(trainM$MarkDown1),]$MarkDown1 <- 0
+trainM[is.na(trainM$MarkDown2),]$MarkDown2 <- 0
+trainM[is.na(trainM$MarkDown3),]$MarkDown3 <- 0
+trainM[is.na(trainM$MarkDown4),]$MarkDown4 <- 0
+trainM[is.na(trainM$MarkDown5),]$MarkDown5 <- 0
+
+
+# 5. Splitting into training and testing datasets
+index <- sample(nrow(trainM),nrow(trainM)*0.70)
+trainM <- trainM[index,]
+testM <- trainM[-index,]
+
+# 6. Modelling
+Model3 <- lm(formula =
+log(Weekly_Sales)~Size+MarkDown3+MarkDown5 ,data = trainM)
+summary(Model3)
+par(mfrow=c(1,1))
+plot(Model3)
+
+trainM$Prediction <- exp(Model3$fitted.values)
+View(trainM)
+
+trainM2011 <- trainM %>% filter(Year == 2011) %>% group_by(Store)
+%>%
+summarize(WeeklySales = sum(Weekly_Sales), WeeklyPrediction =
+sum(Prediction))
+par(mfrow=c(1,1))
+plot(x = trainM2011$Store, y = trainM2011$WeeklySales, col = 'Red', main
+="Actual vs Prediciton - Traning Data", xlab = "Stores", ylab = "Weekly
+Sales")
+lines(x = trainM2011$Store, y = trainM2011$WeeklyPrediction, col = 'blue')
+
+# Making Prediciton using Finalized Model
+
+pred <- predict(Model3, newdata = testM, interval = c('confidence'), level =
+0.95, type = 'response')
+
+testM$Prediction <- exp(pred[, 2])
+
+View(testM)
+
+testMSum <- testM %>% group_by(Store) %>%
+summarize(WeeklySales = sum(Weekly_Sales), WeeklyPrediction =
+sum(Prediction))
+plot(x = testMSum$Store, y = testMSum$WeeklySales, col = 'Red', main =
+"Actual vs Prediction - Testing Data", xlab = "Stores", ylab = "Weekly
+Sales")
+lines(x = testMSum$Store, y = testMSum$WeeklyPrediction, col = 'blue')
